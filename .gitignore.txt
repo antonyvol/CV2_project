@@ -1,7 +1,0 @@
-*.h5
-*.jpg
-*.png
-*.jpeg
-*.pkl
-**/models
-**/cv2_data
