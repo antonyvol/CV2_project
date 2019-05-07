@@ -66,6 +66,8 @@ def relu_separable_bn_block(inputs, filters, name_prefix, is_training, data_form
 def XceptionModel(input_image, num_classes, is_training = False, data_format='channels_last'):
     bn_axis = -1 if data_format == 'channels_last' else 1
     
+    outputs = []
+
     # Entry Flow
     inputs = tf.layers.conv2d(input_image, 32, (3, 3), use_bias=False, name='block1_conv1', strides=(2, 2),
                 padding='valid', data_format=data_format, activation=None,
@@ -148,6 +150,8 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
         inputs = relu_separable_bn_block(inputs, 728, prefix + '_sepconv3', is_training, data_format)
         inputs = tf.add(inputs, residual, name=prefix + '_residual_add')
 
+        outputs.append(inputs)
+
     # Exit Flow
     residual = tf.layers.conv2d(inputs, 1024, (1, 1), use_bias=False, name='conv2d_4', strides=(2, 2),
                 padding='same', data_format=data_format, activation=None,
@@ -208,8 +212,6 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
     #                         bias_initializer=tf.zeros_initializer(),
     #                         name='dense', reuse=None)
 
-    outputs = inputs
-
     return outputs
 
 
@@ -238,8 +240,10 @@ with tf.Session() as sess:
     np_image /= 127.5
     np_image -= 1.
     #np_image = np.transpose(np_image, (0, 3, 1, 2))
-    predict = sess.run(outputs, feed_dict = {input_image : np_image})
-    print(predict)
+    out = sess.run(outputs, feed_dict = {input_image : np_image})
+    out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
+    idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
+    np.save("feature_maps", out_arr[:,:,idx])
     # print(np.argmax(predict))
     # print('Predicted:', decode_predictions(predict, 1))
 
