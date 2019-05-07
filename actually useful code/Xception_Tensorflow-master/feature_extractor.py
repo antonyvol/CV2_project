@@ -215,39 +215,38 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
     return outputs
 
 
-tf.logging.set_verbosity(tf.logging.ERROR)
-tf.reset_default_graph()
-
-input_image = tf.placeholder(tf.float32,  shape = (None, 299, 299, 3), name = 'input_placeholder')
-outputs = XceptionModel(input_image, 1000, is_training = True, data_format='channels_last')
-
-saver = tf.train.Saver()
-
-with tf.Session() as sess:
-    init = tf.global_variables_initializer()
-    sess.run(init)
-
-    saver.restore(sess, "./models/xception_model.ckpt")
-
-    image_file = ['C:/Users/anton/Documents/Study/CV2_project/cv2_data/train/images/0001.jpg']
-    image_array = []
-    for file in image_file:
-        np_image = scipy.misc.imread(file, mode='RGB')
-        np_image = scipy.misc.imresize(np_image, (299, 299))
-        np_image = np.expand_dims(np_image, axis=0).astype(np.float32)
-        image_array.append(np_image)
-    np_image = np.concatenate(image_array, axis = 0)
-    np_image /= 127.5
-    np_image -= 1.
-    #np_image = np.transpose(np_image, (0, 3, 1, 2))
-    out = sess.run(outputs, feed_dict = {input_image : np_image})
-    out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
-    idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
-    np.save("feature_maps", out_arr[:,:,idx])
-    # print(np.argmax(predict))
-    # print('Predicted:', decode_predictions(predict, 1))
 
 
     
 def extract_features(img):
-	pass
+	tf.logging.set_verbosity(tf.logging.ERROR)
+	tf.reset_default_graph()
+
+	input_image = tf.placeholder(tf.float32,  shape = (None, 299, 299, 3), name = 'input_placeholder')
+	outputs = XceptionModel(input_image, 1000, is_training = True, data_format='channels_last')
+
+	saver = tf.train.Saver()
+
+	with tf.Session() as sess:
+		init = tf.global_variables_initializer()
+		sess.run(init)
+
+		saver.restore(sess, "./models/xception_model.ckpt")
+
+	    # image_file = ['C:/Users/anton/Documents/Study/CV2_project/cv2_data/train/images/0001.jpg']
+	    
+		np_image = scipy.misc.imread(img, mode='RGB')
+		np_image = scipy.misc.imresize(np_image, (299, 299))
+		np_image = np.expand_dims(np_image, axis=0).astype(np.float32)
+	    #     image_array.append(np_image)
+	    # np_image = np.concatenate(image_array, axis = 0)
+		np_image /= 127.5
+		np_image -= 1.
+	    #np_image = np.transpose(np_image, (0, 3, 1, 2))
+		out = sess.run(outputs, feed_dict = {input_image : np_image})
+		out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
+		idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
+	    # np.save("feature_maps", out_arr[:,:,idx])
+	    # print(np.argmax(predict))
+	    # print('Predicted:', decode_predictions(predict, 1))
+		return out_arr[:,:,idx]
