@@ -21,13 +21,18 @@
 # SOFTWARE.
 
 import tensorflow as tf
+import numpy as np
+# from keras.applications.imagenet_utils import decode_predictions
+import scipy
+
+# ---------------- PARAMETERS -----------------
 
 USE_FUSED_BN = True
 BN_EPSILON = 0.001
 BN_MOMENTUM = 0.99
 
-'''snippet from inception V3 in slim
-'''
+# ----------------- HELPER METHODS -------------------
+
 def reduced_kernel_size_for_small_input(input_tensor, kernel_size):
   shape = input_tensor.get_shape().as_list()
   if shape[1] is None or shape[2] is None:
@@ -37,6 +42,7 @@ def reduced_kernel_size_for_small_input(input_tensor, kernel_size):
         min(shape[1], kernel_size[0]), min(shape[2], kernel_size[1])
     ]
   return kernel_size_out
+
 
 def relu_separable_bn_block(inputs, filters, name_prefix, is_training, data_format):
     bn_axis = -1 if data_format == 'channels_last' else 1
@@ -54,7 +60,9 @@ def relu_separable_bn_block(inputs, filters, name_prefix, is_training, data_form
                             epsilon=BN_EPSILON, training=is_training, reuse=None, fused=USE_FUSED_BN)
     return inputs
 
-"""Contains the definition for Xception V1 classification network."""
+
+# ----------- MODEL BUILDING --------------
+
 def XceptionModel(input_image, num_classes, is_training = False, data_format='channels_last'):
     bn_axis = -1 if data_format == 'channels_last' else 1
     
@@ -180,35 +188,32 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
                             epsilon=BN_EPSILON, training=is_training, reuse=None, fused=USE_FUSED_BN)
     inputs = tf.nn.relu(inputs, name='block14_sepconv2_act')
 
-    if data_format == 'channels_first':
-        channels_last_inputs = tf.transpose(inputs, [0, 2, 3, 1])
-    else:
-        channels_last_inputs = inputs
+    # if data_format == 'channels_first':
+    #     channels_last_inputs = tf.transpose(inputs, [0, 2, 3, 1])
+    # else:
+    #     channels_last_inputs = inputs
 
-    inputs = tf.layers.average_pooling2d(inputs, pool_size = reduced_kernel_size_for_small_input(channels_last_inputs, [10, 10]), strides = 1, padding='valid', data_format=data_format, name='avg_pool')
+    # inputs = tf.layers.average_pooling2d(inputs, pool_size = reduced_kernel_size_for_small_input(channels_last_inputs, [10, 10]), strides = 1, padding='valid', data_format=data_format, name='avg_pool')
 
-    # ------------------------ CUR HERE -----------------------------------
+    # ------------------------ CUT HERE -----------------------------------
 
-    if data_format == 'channels_first':
-        inputs = tf.squeeze(inputs, axis=[2, 3])
-    else:
-        inputs = tf.squeeze(inputs, axis=[1, 2])
+    # if data_format == 'channels_first':
+    #     inputs = tf.squeeze(inputs, axis=[2, 3])
+    # else:
+    #     inputs = tf.squeeze(inputs, axis=[1, 2])
 
-    outputs = tf.layers.dense(inputs, num_classes,
-                            activation=tf.nn.softmax, use_bias=True,
-                            kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                            bias_initializer=tf.zeros_initializer(),
-                            name='dense', reuse=None)
+    # outputs = tf.layers.dense(inputs, num_classes,
+    #                         activation=tf.nn.softmax, use_bias=True,
+    #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+    #                         bias_initializer=tf.zeros_initializer(),
+    #                         name='dense', reuse=None)
+
+    outputs = inputs
 
     return outputs
 
-'''model test samples
-'''
-import numpy as np
-# from tensorflow.python.keras._impl.keras.applications.imagenet_utils import decode_predictions  # pylint: disable=unused-import
-from keras.applications.imagenet_utils import decode_predictions
-import scipy
 
+tf.logging.set_verbosity(tf.logging.ERROR)
 tf.reset_default_graph()
 
 input_image = tf.placeholder(tf.float32,  shape = (None, 299, 299, 3), name = 'input_placeholder')
@@ -222,7 +227,7 @@ with tf.Session() as sess:
 
     saver.restore(sess, "./models/xception_model.ckpt")
 
-    image_file = ['test_images/000013.jpg', 'test_images/000018.jpg', 'test_images/000031.jpg', 'test_images/000038.jpg', 'test_images/000045.jpg']
+    image_file = ['C:/Users/anton/Documents/Study/CV2_project/cv2_data/train/images/0001.jpg']
     image_array = []
     for file in image_file:
         np_image = scipy.misc.imread(file, mode='RGB')
@@ -234,8 +239,11 @@ with tf.Session() as sess:
     np_image -= 1.
     #np_image = np.transpose(np_image, (0, 3, 1, 2))
     predict = sess.run(outputs, feed_dict = {input_image : np_image})
-    #print(predict)
-    print(np.argmax(predict))
-    print('Predicted:', decode_predictions(predict, 1))
+    print(predict)
+    # print(np.argmax(predict))
+    # print('Predicted:', decode_predictions(predict, 1))
 
 
+    
+def extract_features(img):
+	pass
