@@ -23,6 +23,7 @@
 import tensorflow as tf
 import numpy as np
 import scipy
+import os
 
 # ---------------- PARAMETERS -----------------
 
@@ -194,9 +195,16 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
     return outputs
 
 
+def prepare_image(img):
+	np_image = scipy.misc.imread(img, mode='RGB')
+	np_image = scipy.misc.imresize(np_image, (299, 299))
+	np_image = np.expand_dims(np_image, axis=0).astype(np.float32)
+	np_image /= 127.5
+	np_image -= 1.
 
-
+	return np_image
     
+
 def extract_features(img):
 	tf.logging.set_verbosity(tf.logging.ERROR)
 	tf.reset_default_graph()
@@ -212,14 +220,38 @@ def extract_features(img):
 
 		saver.restore(sess, "./models/xception_model.ckpt")
 	    
-		np_image = scipy.misc.imread(img, mode='RGB')
-		np_image = scipy.misc.imresize(np_image, (299, 299))
-		np_image = np.expand_dims(np_image, axis=0).astype(np.float32)
-
-		np_image /= 127.5
-		np_image -= 1.
+		np_image = prepare_image(img)
 		out = sess.run(outputs, feed_dict = {input_image : np_image})
 		out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
 		idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
 
 		return out_arr[:,:,idx]
+
+
+
+def extract_features_batch(img_dir):
+	tf.logging.set_verbosity(tf.logging.ERROR)
+	tf.reset_default_graph()
+
+	input_image = tf.placeholder(tf.float32,  shape = (None, 299, 299, 3), name = 'input_placeholder')
+	outputs = XceptionModel(input_image, 1000, is_training = True, data_format='channels_last')
+
+	saver = tf.train.Saver()
+
+	res_arr = []
+
+	with tf.Session() as sess:
+		init = tf.global_variables_initializer()
+		sess.run(init)
+
+		saver.restore(sess, "./models/xception_model.ckpt")
+		
+		for i, img in enumerate(os.listdir(img_dir)):
+			np_image = prepare_image(img_dir + '/' + img)
+			out = sess.run(outputs, feed_dict = {input_image : np_image})
+			out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
+			idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
+			res_arr.append(out_arr[:,:,idx])
+			print(str(i) + ' out of ' + str(len(os.listdir(img_dir))))
+
+		return np.asarray(res_arr)
