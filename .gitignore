@@ -4,7 +4,6 @@
 *.png
 *.jpeg
 *.pkl
-**/models
 **/cv2_data
 
 # Compiled source #

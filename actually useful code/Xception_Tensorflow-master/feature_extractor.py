@@ -22,7 +22,6 @@
 
 import tensorflow as tf
 import numpy as np
-# from keras.applications.imagenet_utils import decode_predictions
 import scipy
 
 # ---------------- PARAMETERS -----------------
@@ -192,26 +191,6 @@ def XceptionModel(input_image, num_classes, is_training = False, data_format='ch
                             epsilon=BN_EPSILON, training=is_training, reuse=None, fused=USE_FUSED_BN)
     inputs = tf.nn.relu(inputs, name='block14_sepconv2_act')
 
-    # if data_format == 'channels_first':
-    #     channels_last_inputs = tf.transpose(inputs, [0, 2, 3, 1])
-    # else:
-    #     channels_last_inputs = inputs
-
-    # inputs = tf.layers.average_pooling2d(inputs, pool_size = reduced_kernel_size_for_small_input(channels_last_inputs, [10, 10]), strides = 1, padding='valid', data_format=data_format, name='avg_pool')
-
-    # ------------------------ CUT HERE -----------------------------------
-
-    # if data_format == 'channels_first':
-    #     inputs = tf.squeeze(inputs, axis=[2, 3])
-    # else:
-    #     inputs = tf.squeeze(inputs, axis=[1, 2])
-
-    # outputs = tf.layers.dense(inputs, num_classes,
-    #                         activation=tf.nn.softmax, use_bias=True,
-    #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
-    #                         bias_initializer=tf.zeros_initializer(),
-    #                         name='dense', reuse=None)
-
     return outputs
 
 
@@ -232,21 +211,15 @@ def extract_features(img):
 		sess.run(init)
 
 		saver.restore(sess, "./models/xception_model.ckpt")
-
-	    # image_file = ['C:/Users/anton/Documents/Study/CV2_project/cv2_data/train/images/0001.jpg']
 	    
 		np_image = scipy.misc.imread(img, mode='RGB')
 		np_image = scipy.misc.imresize(np_image, (299, 299))
 		np_image = np.expand_dims(np_image, axis=0).astype(np.float32)
-	    #     image_array.append(np_image)
-	    # np_image = np.concatenate(image_array, axis = 0)
+
 		np_image /= 127.5
 		np_image -= 1.
-	    #np_image = np.transpose(np_image, (0, 3, 1, 2))
 		out = sess.run(outputs, feed_dict = {input_image : np_image})
 		out_arr = np.concatenate(np.squeeze(np.asarray(out))[4:], axis=2)
 		idx = np.random.randint(out_arr.shape[-1], size=int(out_arr.shape[-1] / 2))
-	    # np.save("feature_maps", out_arr[:,:,idx])
-	    # print(np.argmax(predict))
-	    # print('Predicted:', decode_predictions(predict, 1))
+
 		return out_arr[:,:,idx]
