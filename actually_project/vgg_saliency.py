@@ -17,6 +17,8 @@ import tensorflow as tf
 import scipy
 import cv2
 
+tf.reset_default_graph()
+
 # !pip3 install opencv-python
 
 # tf.test.gpu_device_name() # should print '/device:GPU:0' if Runtime is properly set to GPU
@@ -37,7 +39,7 @@ def create_dataset_from_files(files, grey=False):
         np_image = np.expand_dims(np_image, axis=-1).astype(np.float32)
       return np_image
     listing = os.listdir(files)
-    res = np.array([load_img(os.path.join(files, img)) for img in listing])
+    res = np.array([load_img(os.path.join(files, img)) for i, img in enumerate(listing) if i % 5 == 0]) # every 5th image
     return res
 
 # cv2_data_path = '/content/drive/My Drive/CV/cv2_data/' # replace with your path
@@ -73,18 +75,18 @@ labels = tf.placeholder(tf.int64, [None, 180, 320, 1])
 with tf.name_scope('preprocess') as scope:
   imgs = tf.image.convert_image_dtype(images, tf.float32)
   mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32
-                       , shape=[1 , 1, 1, 3], name='img_mean')
+                       , shape=[1, 1, 1, 3], name='img_mean')
   imgs_normalized = imgs - mean
 
 with tf.name_scope('conv1_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv1_1_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(imgs_normalized, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv1_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv1_2_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -94,14 +96,14 @@ with tf.name_scope('pool1') as scope:
 	pool1 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv2_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv2_1_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv2_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv2_2_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -111,21 +113,21 @@ with tf.name_scope('pool2') as scope:
 	pool2 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv3_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv3_1_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv3_2_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_3') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv3_3_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -135,7 +137,7 @@ with tf.name_scope('pool3') as scope:
 	pool3 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(1,1), padding='same')
   
 with tf.name_scope('conv4_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=weights['conv4_1_b'], trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool3, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -148,14 +150,14 @@ with tf.name_scope('dropout') as scope:
   out = tf.keras.layers.Dropout(rate=1-0.5)(out)
   
 with tf.name_scope('conv_sal_1') as scope:
-  kernel = tf.get_variable("kernel_1", [3, 3, 896, 64], dtype=tf.float32,
-                           initializer=tf.initializers.glorot_normal)
+  init = tf.initializers.glorot_normal()
+  kernel = tf.Variable(init([3, 3, 896, 64]), name="kernel_1")
   conv = tf.nn.conv2d(out, kernel, [1, 1, 1, 1], padding='SAME')
   act = tf.nn.relu(conv, name=scope)
   
 with tf.name_scope('conv_sal_2') as scope:
-  kernel = tf.get_variable("kernel_2", [1, 1, 64, 1], dtype=tf.float32,
-                           initializer=tf.initializers.glorot_normal)
+  init = tf.initializers.glorot_normal()
+  kernel = tf.Variable(init([1, 1, 64, 1]), name="kernel_2")
   conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
   saliency_raw = tf.nn.relu(conv, name=scope)
 
@@ -169,7 +171,6 @@ with tf.name_scope('loss') as scope:
   
   # Prediction is smaller than target, so downscale target to same size
   target_shape = predicted_saliency.shape[1:3]
-  print(fixations_normalized)
   target_downscaled = tf.image.resize_images(fixations_normalized, target_shape)
 
 	# Loss function from Cornia et al. (2016) [with higher weight for salient pixels]
@@ -207,13 +208,15 @@ def get_batch(gen, batchsize):
 		batch_fixations.append(target)
 	return np.array(batch_imgs), np.array(batch_fixations)
 
-batchsize = 64
-num_batches = 10000
+batchsize = 32
+num_batches = 100
 
 saver = tf.train.Saver()
+for i, var in enumerate(saver._var_list):
+    print('Var {}: {}'.format(i, var))
 
 with tf.Session() as sess:
-  writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
+  # writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
   sess.run(tf.global_variables_initializer())
 
   gen = data_shuffler(train_X, train_y)
@@ -221,11 +224,12 @@ with tf.Session() as sess:
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss, = sess.run([minimize_op, loss],
+    _, batch_loss = sess.run([minimize_op, loss],
       feed_dict={images: train_X[idx,...], labels: train_y[idx]})
 
-    if b % 10 == 0:
-      print('Batch {} done: batch loss {}'.format(b, batch_loss))
+    print('Batch {} done: batch loss {}'.format(b, batch_loss))
+    save_path = saver.save(sess, os.path.join(MODEL_PATH,'trained_model'), global_step=b)
+
       
   # run testing in smaller batches so we don't run out of memory.
   test_batch_size = 100
@@ -240,14 +244,13 @@ with tf.Session() as sess:
 
     test_loss = sess.run([loss], 
                                         feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx]})
-    print('Test batch {} done: batch loss {}, batch accuracy {}'.format(test_batch, test_loss))
+    print('Test batch {} done: batch loss {}'.format(test_batch, test_loss))
     test_losses.append(test_loss)
     #test_accs.append(test_acc)
 
     print('Test loss: {} -- test accuracy: {}'.format(np.average(test_losses), np.average(test_accs)))
 
   # we could save at end of training, for example
-  save_path = saver.save(sess, os.path.join(MODEL_PATH,'trained_model'), global_step=batch)
 
 
 
