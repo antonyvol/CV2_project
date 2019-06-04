@@ -6,9 +6,9 @@ import math
 # batch size
 b_s = 10
 # number of rows of input images
-shape_r = 180
+shape_r = 480
 # number of cols of input images
-shape_c = 320
+shape_c = 640
 # number of rows of predicted maps
 shape_r_gt = int(math.ceil(shape_r / 8))
 # number of cols of predicted maps

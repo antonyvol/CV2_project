@@ -10,11 +10,11 @@ from model import ml_net_model, loss
 
 def generator(b_s, phase_gen='train'):
     if phase_gen == 'train':
-        images = [imgs_train_path + f for f in os.listdir(imgs_train_path) if f.endswith('.jpg')]
-        maps = [maps_train_path + f for f in os.listdir(maps_train_path) if f.endswith('.jpg')]
+        images = [imgs_train_path + '/' + f for f in os.listdir(imgs_train_path) if f.endswith('.jpg')]
+        maps = [maps_train_path + '/' +  f for f in os.listdir(maps_train_path) if f.endswith('.jpg')]
     elif phase_gen == 'val':
-        images = [imgs_val_path + f for f in os.listdir(imgs_val_path) if f.endswith('.jpg')]
-        maps = [maps_val_path + f for f in os.listdir(maps_val_path) if f.endswith('.jpg')]
+        images = [imgs_val_path + '/' + f for f in os.listdir(imgs_val_path) if f.endswith('.jpg')]
+        maps = [maps_val_path + '/' + f for f in os.listdir(maps_val_path) if f.endswith('.jpg')]
     else:
         raise NotImplementedError
 
@@ -28,7 +28,7 @@ def generator(b_s, phase_gen='train'):
 
 
 def generator_test(b_s, imgs_test_path):
-    images = [imgs_test_path + f for f in os.listdir(imgs_test_path) if f.endswith('.jpg')]
+    images = [imgs_test_path + '\\' + f for f in os.listdir(imgs_test_path) if f.endswith('.jpg')] # HAHAHAHH GOTCHA
     images.sort()
 
     counter = 0
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         predictions = model.predict_generator(generator_test(b_s=1, imgs_test_path=imgs_test_path), nb_imgs_test)
 
         for pred, name in zip(predictions, file_names):
-            original_image = cv2.imread(imgs_test_path + name, 0)
+            original_image = cv2.imread(imgs_test_path + '\\' + name, 0)
             res = postprocess_predictions(pred[0], original_image.shape[0], original_image.shape[1])
             cv2.imwrite(output_folder + '%s' % name, res.astype(int))
 

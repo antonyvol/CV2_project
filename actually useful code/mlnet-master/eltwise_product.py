@@ -1,5 +1,5 @@
 from keras.layers.core import Layer, InputSpec
-from keras import constraints, regularizers, initializers, activations
+from keras import constraints, regularizers, initializations, activations
 import keras.backend as K
 import theano.tensor as T
 

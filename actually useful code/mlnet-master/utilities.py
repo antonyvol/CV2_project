@@ -29,6 +29,7 @@ def padding(img, shape_r=480, shape_c=640, channels=3):
 
 
 def preprocess_images(paths, shape_r, shape_c):
+    print(paths)
     ims = np.zeros((len(paths), shape_r, shape_c, 3))
 
     for i, path in enumerate(paths):
