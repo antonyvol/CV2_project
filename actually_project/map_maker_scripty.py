@@ -46,8 +46,8 @@ def create_dataset_from_files(files, grey=False):
 # cv2_data_path = '/content/drive/My Drive/CV/cv2_data/' # replace with your path
 # cv2_training_imgs = os.path.join(DATA_PATH,'train/images')
 # cv2_training_fixs = os.path.join(DATA_PATH,'train/fixations')
-# cv2_validation_imgs = os.path.join(DATA_PATH, 'val/images')
-# cv2_validation_fixs = os.path.join(DATA_PATH, 'val/fixations')
+cv2_validation_imgs = os.path.join(DATA_PATH, 'val/images')
+cv2_validation_fixs = os.path.join(DATA_PATH, 'val/fixations')
 cv2_testing = os.path.join(DATA_PATH, 'test/images')
 
 # print('Loading train_X')
@@ -58,13 +58,13 @@ cv2_testing = os.path.join(DATA_PATH, 'test/images')
 # train_y = create_dataset_from_files(cv2_training_fixs, True)
 # print(train_y.shape, train_y.dtype)
 
-# print('Loading validation_X')
-# validation_X = create_dataset_from_files(cv2_validation_imgs)
-# print(validation_X.shape, validation_X.dtype)
+print('Loading validation_X')
+validation_X = create_dataset_from_files(cv2_validation_imgs)
+print(validation_X.shape, validation_X.dtype)
 
-# print('Loading validation_y')
-# validation_y = create_dataset_from_files(cv2_validation_fixs, True)
-# print(validation_y.shape, validation_y.dtype)
+print('Loading validation_y')
+validation_y = create_dataset_from_files(cv2_validation_fixs, True)
+print(validation_y.shape, validation_y.dtype)
 
 print('Loading test_X')
 test_X = create_dataset_from_files(cv2_testing)
@@ -74,7 +74,7 @@ images = tf.placeholder(tf.uint8, [1, 180, 320, 3]) # None to indicate a dimensi
 # labels = tf.placeholder(tf.int64, [None, 180, 320, 1])
 
 with tf.name_scope('preprocess') as scope:
-  imgs = tf.image.convert_image_dtype(images, tf.float32)
+  imgs = tf.image.convert_image_dtype(images, tf.float32) * 255.0
   mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32
                        , shape=[1 , 1, 1, 3], name='img_mean')
   imgs_normalized = imgs - mean
@@ -147,20 +147,24 @@ with tf.name_scope('conv4_1') as scope:
 with tf.name_scope('concat') as scope:
   out = tf.concat([pool2, pool3, act], -1)
 
-with tf.name_scope('dropout') as scope:
-  out = tf.keras.layers.Dropout(rate=1-0.5)(out)
+#with tf.name_scope('dropout') as scope:
+ # out = tf.keras.layers.Dropout(rate=1-0.5)(out)
   
 with tf.name_scope('conv_sal_1') as scope:
   init = tf.initializers.glorot_normal()
   kernel = tf.Variable(init([3, 3, 896, 64]), name="kernel_1")
+  biases = tf.Variable(tf.zeros([64,], tf.float32))
   conv = tf.nn.conv2d(out, kernel, [1, 1, 1, 1], padding='SAME')
-  act = tf.nn.relu(conv, name=scope)
+  out = tf.nn.bias_add(conv, biases)
+  act = tf.nn.relu(out, name=scope)
   
 with tf.name_scope('conv_sal_2') as scope:
   init = tf.initializers.glorot_normal()
   kernel = tf.Variable(init([1, 1, 64, 1]), name="kernel_2")
+  biases = tf.Variable(tf.zeros([1,], tf.float32))
   conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
-  saliency_raw = tf.nn.relu(conv, name=scope)
+  out = tf.nn.bias_add(conv, biases)
+  saliency_raw = tf.nn.relu(out, name=scope)
   max_value_per_image = tf.reduce_max(saliency_raw, axis=[1,2,3], keepdims=True)
   predicted_saliency = (saliency_raw / max_value_per_image)
 
@@ -214,7 +218,7 @@ with tf.name_scope('conv_sal_2') as scope:
 
 # batchsize = 32
 # num_batches = 100
-
+import matplotlib.pyplot as plt
 # saver = tf.train.import_meta_graph(os.path.join(MODEL_PATH, 'trained_model-1.meta'))
 saver = tf.train.Saver()
 # for tensor in tf.get_default_graph().get_operations():
@@ -225,17 +229,23 @@ saver = tf.train.Saver()
 with tf.Session() as sess:
 # #   # writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
   sess.run(tf.global_variables_initializer())
-  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-9'))
+  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-46'))
 #   print('Model restored yäy')
 # # #   print('conv_sal_1/kernel_1 = {}'.format(kernel.eval()) )
   res = sess.run(predicted_saliency,
-      feed_dict={images: np.expand_dims(test_X[6], 0)})
-  cv2.imshow('map',cv2.resize(res.squeeze(), (320, 180)))
-  cv2.imshow('img',test_X[6])
-  cv2.waitKey(0)
-  cv2.destroyAllWindows()
+      feed_dict={images: np.expand_dims(validation_X[6], 0)})
+  #img = cv2.resize(res.squeeze(), (320, 180))
+  #cv2.imshow('map', img)
+  #cv2.imshow('img',test_X[6])
+  #cv2.waitKey(0)
+  #cv2.destroyAllWindows()
   # gen = data_shuffler(train_X, train_y)
-
+  plt.imshow(validation_X[6].squeeze())
+  plt.show() 
+  plt.imshow(validation_y[6].squeeze())
+  plt.show()  
+  plt.imshow(res.squeeze())
+  plt.show() 
   # for b in range(num_batches):
   #   batch_imgs, batch_fixations = get_batch(gen, batchsize)
   #   idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
