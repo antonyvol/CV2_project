@@ -70,7 +70,7 @@ test_X = create_dataset_from_files(cv2_testing)
 print(test_X.shape, test_X.dtype)
 
 images = tf.placeholder(tf.uint8, [None, 180, 320, 3]) # None to indicate a dimension can vary at runtime
-labels = tf.placeholder(tf.float32, [None, 180, 320, 1])
+labels = tf.placeholder(tf.uint8, [None, 180, 320, 1])
 #is_training = tf.placeholder(tf.bool, [1])
 
 with tf.name_scope('preprocess') as scope:
@@ -79,7 +79,9 @@ with tf.name_scope('preprocess') as scope:
   mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32
                       , shape=[1, 1, 1, 3], name='img_mean')
   imgs_normalized = imgs - mean
-
+  fixations = tf.image.convert_image_dtype(labels, tf.float32) #* 255.0
+  fixations_normalized = fixations #- mean
+ 
 with tf.name_scope('conv1_1') as scope:
 	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([64,], tf.float32), trainable=True, name="biases")
@@ -168,7 +170,7 @@ with tf.name_scope('conv_sal_2') as scope:
   saliency_raw = tf.nn.relu(out, name=scope)
 
 #with tf.name_scope('preprocess_labels') as scope:
-#  fixations_normalized = tf.image.convert_image_dtype(labels, tf.float32)
+  
 
 with tf.name_scope('loss') as scope:
 	# normalize saliency
@@ -177,22 +179,18 @@ with tf.name_scope('loss') as scope:
   
   # Prediction is smaller than target, so downscale target to same size
   target_shape = predicted_saliency.shape[1:3]
-  target_downscaled = tf.image.resize_images(tf.image.convert_image_dtype(labels, tf.float32), target_shape)
+  target_downscaled = tf.image.resize_images(fixations_normalized, target_shape)
 
 	# Loss function from Cornia et al. (2016) [with higher weight for salient pixels]
   alpha = 1.01
   weights = 1.0 / (alpha - target_downscaled)
   loss = tf.losses.mean_squared_error(labels=target_downscaled, 
-										predictions=predicted_saliency, 
+										predictions=predicted_saliency,
 										weights=weights)
 
 	# Optimizer settings from Cornia et al. (2016) [except for decay]
   optimizer = tf.train.MomentumOptimizer(learning_rate=0.00025, momentum=0.9, use_nesterov=True)
   minimize_op = optimizer.minimize(loss)
-
-# with tf.name_scope('accuracy') as scope:
-#   acc, acc_op = tf.metrics.accuracy(labels=target_downscaled, 
-#                                     predictions=predicted_saliency)
 
 def data_shuffler(imgs, targets):
 	while True: # produce new epochs forever
@@ -225,7 +223,8 @@ l_summary = tf.summary.scalar(name="loss", tensor=loss)
 f_img_summary = tf.summary.image(name="fixation", tensor=tf.image.convert_image_dtype(labels, tf.float32))
 i_img_summary = tf.summary.image(name="input", tensor=imgs_normalized)
 pred_img_summary = tf.summary.image(name="predicted_saliency", tensor=predicted_saliency)
-w_summary = tf.summary.tensor_summary(name="weights", tensor=weights)
+targ_img_summary = tf.summary.image(name="target_downscaled", tensor=target_downscaled)
+w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 
 with tf.Session() as sess:
   summary_writer = tf.summary.FileWriter(logdir='./', graph=sess.graph)
@@ -236,12 +235,14 @@ with tf.Session() as sess:
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss, ls, fs, i_s, ps, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, w_summary],
+    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary],
       feed_dict={images: train_X[idx,...], labels: train_y[idx]}) 
 
     summary_writer.add_summary(ls, global_step=b)
     summary_writer.add_summary(fs, global_step=b)
+    summary_writer.add_summary(i_s, global_step=b)
     summary_writer.add_summary(ps, global_step=b)
+    summary_writer.add_summary(ts, global_step=b)
     summary_writer.add_summary(ws, global_step=b)
 
     #yeah = sess.run([weights],
