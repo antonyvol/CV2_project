@@ -70,24 +70,25 @@ test_X = create_dataset_from_files(cv2_testing)
 print(test_X.shape, test_X.dtype)
 
 images = tf.placeholder(tf.uint8, [None, 180, 320, 3]) # None to indicate a dimension can vary at runtime
-labels = tf.placeholder(tf.int64, [None, 180, 320, 1])
+labels = tf.placeholder(tf.float32, [None, 180, 320, 1])
 #is_training = tf.placeholder(tf.bool, [1])
 
 with tf.name_scope('preprocess') as scope:
+  
   imgs = tf.image.convert_image_dtype(images, tf.float32) * 255.0
   mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32
                       , shape=[1, 1, 1, 3], name='img_mean')
   imgs_normalized = imgs - mean
 
 with tf.name_scope('conv1_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([64,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(imgs_normalized, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv1_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([64,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -97,14 +98,14 @@ with tf.name_scope('pool1') as scope:
 	pool1 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv2_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([128,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv2_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([128,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -114,21 +115,21 @@ with tf.name_scope('pool2') as scope:
 	pool2 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv3_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_3') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -138,7 +139,7 @@ with tf.name_scope('pool3') as scope:
 	pool3 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(1,1), padding='same')
   
 with tf.name_scope('conv4_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=True, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=False, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([512,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool3, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -166,8 +167,8 @@ with tf.name_scope('conv_sal_2') as scope:
   out = tf.nn.bias_add(conv, biases)
   saliency_raw = tf.nn.relu(out, name=scope)
 
-with tf.name_scope('preprocess_labels') as scope:
-  fixations_normalized = tf.image.convert_image_dtype(labels, tf.float32)
+#with tf.name_scope('preprocess_labels') as scope:
+#  fixations_normalized = tf.image.convert_image_dtype(labels, tf.float32)
 
 with tf.name_scope('loss') as scope:
 	# normalize saliency
@@ -176,7 +177,7 @@ with tf.name_scope('loss') as scope:
   
   # Prediction is smaller than target, so downscale target to same size
   target_shape = predicted_saliency.shape[1:3]
-  target_downscaled = tf.image.resize_images(fixations_normalized, target_shape)
+  target_downscaled = tf.image.resize_images(tf.image.convert_image_dtype(labels, tf.float32), target_shape)
 
 	# Loss function from Cornia et al. (2016) [with higher weight for salient pixels]
   alpha = 1.01
@@ -220,8 +221,14 @@ saver = tf.train.Saver()
 for i, var in enumerate(saver._var_list):
     print('Var {}: {}'.format(i, var))
 
+l_summary = tf.summary.scalar(name="loss", tensor=loss)
+f_img_summary = tf.summary.image(name="fixation", tensor=tf.image.convert_image_dtype(labels, tf.float32))
+i_img_summary = tf.summary.image(name="input", tensor=imgs_normalized)
+pred_img_summary = tf.summary.image(name="predicted_saliency", tensor=predicted_saliency)
+w_summary = tf.summary.tensor_summary(name="weights", tensor=weights)
+
 with tf.Session() as sess:
-  # writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
+  summary_writer = tf.summary.FileWriter(logdir='./', graph=sess.graph)
   sess.run(tf.global_variables_initializer())
 
   gen = data_shuffler(train_X, train_y)
@@ -229,8 +236,13 @@ with tf.Session() as sess:
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss = sess.run([minimize_op, loss],
-      feed_dict={images: train_X[idx,...], labels: train_y[idx]})
+    _, batch_loss, ls, fs, i_s, ps, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, w_summary],
+      feed_dict={images: train_X[idx,...], labels: train_y[idx]}) 
+
+    summary_writer.add_summary(ls, global_step=b)
+    summary_writer.add_summary(fs, global_step=b)
+    summary_writer.add_summary(ps, global_step=b)
+    summary_writer.add_summary(ws, global_step=b)
 
     #yeah = sess.run([weights],
     #  feed_dict={images: train_X[idx,...], labels: train_y[idx]})
