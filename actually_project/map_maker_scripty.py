@@ -15,6 +15,7 @@ import os
 import tensorflow as tf
 # from tensorboardcolab import *
 import scipy
+import scipy.stats as st
 import cv2
 
 # !pip3 install opencv-python
@@ -71,7 +72,17 @@ test_X = create_dataset_from_files(cv2_testing)
 print(test_X.shape, test_X.dtype)
 
 images = tf.placeholder(tf.uint8, [1, 180, 320, 3]) # None to indicate a dimension can vary at runtime
+gaussian = tf.placeholder(tf.float32, [None, 45, 80, 1])
+
 # labels = tf.placeholder(tf.int64, [None, 180, 320, 1])
+
+def gaussian2d():
+    x = np.linspace(0, 1, 45+1)
+    y = np.linspace(0, 1, 80+1)
+    gaussian1d_x = np.diff(st.norm.cdf(x, loc=0.5, scale=0.2))
+    gaussian1d_y = np.diff(st.norm.cdf(y, loc=0.5, scale=0.2))
+    gaussian2d = np.outer(gaussian1d_x, gaussian1d_y).reshape((-1, 45, 80, 1))
+    return gaussian2d
 
 with tf.name_scope('preprocess') as scope:
   imgs = tf.image.convert_image_dtype(images, tf.float32) * 255.0
@@ -165,6 +176,11 @@ with tf.name_scope('conv_sal_2') as scope:
   conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
   out = tf.nn.bias_add(conv, biases)
   saliency_raw = tf.nn.relu(out, name=scope)
+
+with tf.name_scope('gaussian') as scope:
+  shape = tf.convert_to_tensor([-1, 45, 80, 1])
+  gaussian = tf.reshape(tf.convert_to_tensor(gaussian), shape)
+  saliency_raw = tf.math.multiply(saliency_raw, gaussian, name=None)
   max_value_per_image = tf.reduce_max(saliency_raw, axis=[1,2,3], keepdims=True)
   predicted_saliency = (saliency_raw / max_value_per_image)
 
@@ -218,6 +234,9 @@ with tf.name_scope('conv_sal_2') as scope:
 
 # batchsize = 32
 # num_batches = 100
+
+gaussian2d = gaussian2d() 
+
 import matplotlib.pyplot as plt
 # saver = tf.train.import_meta_graph(os.path.join(MODEL_PATH, 'trained_model-1.meta'))
 saver = tf.train.Saver()
@@ -229,11 +248,11 @@ saver = tf.train.Saver()
 with tf.Session() as sess:
 # #   # writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
   sess.run(tf.global_variables_initializer())
-  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-46'))
+  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-267'))
 #   print('Model restored yäy')
 # # #   print('conv_sal_1/kernel_1 = {}'.format(kernel.eval()) )
   res = sess.run(predicted_saliency,
-      feed_dict={images: np.expand_dims(validation_X[6], 0)})
+      feed_dict={images: np.expand_dims(validation_X[6], 0), gaussian: gaussian2d})
   #img = cv2.resize(res.squeeze(), (320, 180))
   #cv2.imshow('map', img)
   #cv2.imshow('img',test_X[6])
