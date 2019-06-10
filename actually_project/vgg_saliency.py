@@ -15,6 +15,7 @@ import os
 import tensorflow as tf
 # from tensorboardcolab import *
 import scipy
+import scipy.stats as st
 import cv2
 
 tf.reset_default_graph()
@@ -69,9 +70,18 @@ print('Loading test_X')
 test_X = create_dataset_from_files(cv2_testing)
 print(test_X.shape, test_X.dtype)
 
+def gaussian2d():
+    x = np.linspace(0, 1, 45+1)
+    y = np.linspace(0, 1, 80+1)
+    gaussian1d_x = np.diff(st.norm.cdf(x, loc=0.5, scale=0.2))
+    gaussian1d_y = np.diff(st.norm.cdf(y, loc=0.5, scale=0.2))
+    gaussian2d = np.outer(gaussian1d_x, gaussian1d_y).reshape((-1, 45, 80, 1))
+    return gaussian2d
+
 images = tf.placeholder(tf.uint8, [None, 180, 320, 3]) # None to indicate a dimension can vary at runtime
 labels = tf.placeholder(tf.uint8, [None, 180, 320, 1])
-#is_training = tf.placeholder(tf.bool, [1])
+gaussian = tf.placeholder(tf.float32, [None, 45, 80, 1])
+is_training = tf.placeholder(tf.bool)
 
 with tf.name_scope('preprocess') as scope:
   
@@ -79,18 +89,17 @@ with tf.name_scope('preprocess') as scope:
   mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32
                       , shape=[1, 1, 1, 3], name='img_mean')
   imgs_normalized = imgs - mean
-  fixations = tf.image.convert_image_dtype(labels, tf.float32) #* 255.0
-  fixations_normalized = fixations #- mean
+  fixations_normalized = tf.image.convert_image_dtype(labels, tf.float32)
  
 with tf.name_scope('conv1_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_1_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([64,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(imgs_normalized, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv1_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv1_2_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([64,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -100,14 +109,14 @@ with tf.name_scope('pool1') as scope:
 	pool1 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv2_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_1_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([128,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv2_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv2_2_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([128,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -117,21 +126,21 @@ with tf.name_scope('pool2') as scope:
 	pool2 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(2,2), padding='same')
 
 with tf.name_scope('conv3_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_1_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_2') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_2_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('conv3_3') as scope:
-	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv3_3_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([256,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -141,7 +150,7 @@ with tf.name_scope('pool3') as scope:
 	pool3 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(1,1), padding='same')
   
 with tf.name_scope('conv4_1') as scope:
-	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=False, name="weights")
+	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=True, name="weights")
 	biases = tf.Variable(initial_value=tf.zeros([512,], tf.float32), trainable=True, name="biases")
 	conv = tf.nn.conv2d(pool3, kernel, [1, 1, 1, 1], padding='SAME')
 	out = tf.nn.bias_add(conv, biases)
@@ -151,26 +160,28 @@ with tf.name_scope('concat') as scope:
   out = tf.concat([pool2, pool3, act], -1)
 
 with tf.name_scope('dropout') as scope:
-  out = tf.keras.layers.Dropout(rate=1-0.5)(out)
+  out = tf.layers.dropout(out, rate=0.5, training=is_training, name="dropout")
   
 with tf.name_scope('conv_sal_1') as scope:
   init = tf.initializers.glorot_normal()
-  kernel = tf.Variable(init([3, 3, 896, 64]), name="kernel_1")
-  biases = tf.Variable(tf.zeros([64,], tf.float32))
+  kernel = tf.Variable(init([3, 3, 896, 64]), trainable=True, name="kernel_1")
+  biases = tf.Variable(tf.zeros([64,], tf.float32), trainable=True)
   conv = tf.nn.conv2d(out, kernel, [1, 1, 1, 1], padding='SAME')
   out = tf.nn.bias_add(conv, biases)
   act = tf.nn.relu(out, name=scope)
   
 with tf.name_scope('conv_sal_2') as scope:
   init = tf.initializers.glorot_normal()
-  kernel = tf.Variable(init([1, 1, 64, 1]), name="kernel_2")
-  biases = tf.Variable(tf.zeros([1,], tf.float32))
+  kernel = tf.Variable(init([1, 1, 64, 1]), trainable=True, name="kernel_2")
+  biases = tf.Variable(tf.zeros([1,], tf.float32), trainable=True)
   conv = tf.nn.conv2d(act, kernel, [1, 1, 1, 1], padding='SAME')
   out = tf.nn.bias_add(conv, biases)
-  saliency_raw = tf.nn.relu(out, name=scope)
+  saliency_raw = tf.nn.relu(out, name=scope)  
 
-#with tf.name_scope('preprocess_labels') as scope:
-  
+with tf.name_scope('gaussian') as scope:
+  shape = tf.convert_to_tensor([-1, 45, 80, 1])
+  gaussian = tf.reshape(tf.convert_to_tensor(gaussian), shape)
+  saliency_raw = tf.math.multiply(saliency_raw, gaussian, name=None)
 
 with tf.name_scope('loss') as scope:
 	# normalize saliency
@@ -189,7 +200,7 @@ with tf.name_scope('loss') as scope:
 										weights=weights)
 
 	# Optimizer settings from Cornia et al. (2016) [except for decay]
-  optimizer = tf.train.MomentumOptimizer(learning_rate=0.00025, momentum=0.9, use_nesterov=True)
+  optimizer = tf.train.MomentumOptimizer(learning_rate=0.1, momentum=0.9, use_nesterov=True)
   minimize_op = optimizer.minimize(loss)
 
 def data_shuffler(imgs, targets):
@@ -214,6 +225,7 @@ def get_batch(gen, batchsize):
 
 batchsize = 32
 num_batches = 2000
+gaussian2d = gaussian2d() * 0.2
 
 saver = tf.train.Saver()
 for i, var in enumerate(saver._var_list):
@@ -223,20 +235,20 @@ l_summary = tf.summary.scalar(name="loss", tensor=loss)
 f_img_summary = tf.summary.image(name="fixation", tensor=tf.image.convert_image_dtype(labels, tf.float32))
 i_img_summary = tf.summary.image(name="input", tensor=imgs_normalized)
 pred_img_summary = tf.summary.image(name="predicted_saliency", tensor=predicted_saliency)
-targ_img_summary = tf.summary.image(name="target_downscaled", tensor=target_downscaled)
+targ_img_summary = tf.summary.image(name="prior", tensor=gaussian)
 w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 
 with tf.Session() as sess:
   summary_writer = tf.summary.FileWriter(logdir='./', graph=sess.graph)
   sess.run(tf.global_variables_initializer())
+  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-10'))
 
   gen = data_shuffler(train_X, train_y)
 
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary],
-      feed_dict={images: train_X[idx,...], labels: train_y[idx]}) 
+    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True, gaussian: gaussian2d}) 
 
     summary_writer.add_summary(ls, global_step=b)
     summary_writer.add_summary(fs, global_step=b)
@@ -245,15 +257,11 @@ with tf.Session() as sess:
     summary_writer.add_summary(ts, global_step=b)
     summary_writer.add_summary(ws, global_step=b)
 
-    #yeah = sess.run([weights],
-    #  feed_dict={images: train_X[idx,...], labels: train_y[idx]})
-    #print(yeah)
     print('Batch {} done: batch loss {}'.format(b, batch_loss))
     save_path = saver.save(sess, os.path.join(MODEL_PATH,'trained_model'), global_step=b)
-
       
   # run testing in smaller batches so we don't run out of memory.
-  test_batch_size = 64
+  test_batch_size = 32
   num_test_batches = validation_X.shape[0]/test_batch_size
   test_losses = []
   test_accs = []
@@ -263,11 +271,9 @@ with tf.Session() as sess:
     stop_idx = start_idx + test_batch_size
     test_idx = np.arange(start_idx, stop_idx)
 
-    test_loss = sess.run([loss], 
-                                        feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx]})
+    test_loss = sess.run([loss], feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx], is_training: False, gaussian: gaussian2d})
     print('Test batch {} done: batch loss {}'.format(test_batch, test_loss))
     test_losses.append(test_loss)
-    #test_accs.append(test_acc)
 
     print('Test loss: {} -- test accuracy: {}'.format(np.average(test_losses), np.average(test_accs)))
 
@@ -276,9 +282,8 @@ with tf.Session() as sess:
 
 
 """###TODO:
-* check if loss is calculated correctly YES
+* check if loss is calculated correctly
 * add prior (layer)
-* add accuracy calculation NO
-* hyperparameter optimzation
+* hyperparameter optimization
 """
 
