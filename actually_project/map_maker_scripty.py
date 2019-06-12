@@ -252,16 +252,18 @@ with tf.Session() as sess:
 #   print('Model restored yäy')
 # # #   print('conv_sal_1/kernel_1 = {}'.format(kernel.eval()) )
   res = sess.run(predicted_saliency,
-      feed_dict={images: np.expand_dims(validation_X[6], 0), gaussian: gaussian2d})
+      feed_dict={images: np.expand_dims(validation_X[10], 0), gaussian: gaussian2d})
+
+  
   #img = cv2.resize(res.squeeze(), (320, 180))
   #cv2.imshow('map', img)
   #cv2.imshow('img',test_X[6])
   #cv2.waitKey(0)
   #cv2.destroyAllWindows()
   # gen = data_shuffler(train_X, train_y)
-  plt.imshow(validation_X[6].squeeze())
+  plt.imshow(validation_X[10].squeeze())
   plt.show() 
-  plt.imshow(validation_y[6].squeeze())
+  plt.imshow(validation_y[10].squeeze())
   plt.show()  
   plt.imshow(res.squeeze())
   plt.show() 
