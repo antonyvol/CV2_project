@@ -189,14 +189,27 @@ with tf.name_scope('conv_sal_2') as scope:
   saliency_raw = tf.nn.relu(out, name=scope)  
 
 with tf.name_scope('gaussian') as scope:
-  #mean = tf.Variable(tf.zeros([1], tf.float32), initial_value=[0.5], trainable=True, name="mean")
-  #std = tf.Variable(tf.ones([1], tf.float32), initial_value=[1.], trainable=True, name="std")
-  mean = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="mean")
-  std = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="std")
-  gaussian = gaussian2d(mean, std)
   shape = tf.convert_to_tensor([-1, 45, 80, 1])
-  gaussian = tf.reshape(gaussian, shape)
-  saliency_raw = tf.math.multiply(saliency_raw, gaussian, name=None)
+
+  mean_1 = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="mean_1")
+  std_1 = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="std_1")
+  gaussian_1 = gaussian2d(mean_1, std_1)
+  gaussian_1 = tf.reshape(gaussian_1, shape)
+
+  mean_2 = tf.Variable(initial_value=tf.constant(0.), trainable=True, name="mean_2")
+  std_2 = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="std_2")
+  gaussian_2 = gaussian2d(mean_2, std_2)
+  gaussian_2 = tf.reshape(gaussian_2, shape)
+
+  mean_3 = tf.Variable(initial_value=tf.constant(1.), trainable=True, name="mean_3")
+  std_3 = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="std_3")
+  gaussian_3 = gaussian2d(mean_3, std_3)
+  gaussian_3 = tf.reshape(gaussian_3, shape)
+
+  stacked_gaussians = tf.stack([gaussian_1, gaussian_2, gaussian_3], axis=0)
+  mean_of_gaussians = tf.reduce_mean(stacked_gaussians, axis=0)
+
+  saliency_raw = tf.math.multiply(saliency_raw, mean_of_gaussians, name=None)
 
 with tf.name_scope('loss') as scope:
 	# normalize saliency
@@ -223,7 +236,6 @@ def data_shuffler(imgs, targets):
 		# Shuffle the data for this epoch
 		idx = np.arange(imgs.shape[0])
 		np.random.shuffle(idx)
-
 		imgs = imgs[idx]
 		targets = targets[idx]
 		for i in range(imgs.shape[0]):
@@ -241,19 +253,18 @@ def get_batch(gen, batchsize):
 batchsize = 32
 num_batches = 2000
 mean_std = tf.constant([0.5])
-#gaussian2d = gaussian2d() * 0.2
 
 saver = tf.train.Saver()
 for i, var in enumerate(saver._var_list):
     print('Var {}: {}'.format(i, var))
 
 l_summary = tf.summary.scalar(name="loss", tensor=loss)
-m_summary = tf.summary.scalar(name="mean", tensor=mean)
-s_summary = tf.summary.scalar(name="std", tensor=std)
+m_summary = tf.summary.scalar(name="mean_1", tensor=mean_1)
+s_summary = tf.summary.scalar(name="std_1", tensor=std_1)
 f_img_summary = tf.summary.image(name="fixation", tensor=tf.image.convert_image_dtype(labels, tf.float32))
 i_img_summary = tf.summary.image(name="input", tensor=imgs_normalized)
 pred_img_summary = tf.summary.image(name="predicted_saliency", tensor=predicted_saliency)
-targ_img_summary = tf.summary.image(name="prior", tensor=gaussian)
+targ_img_summary = tf.summary.image(name="learned_prior", tensor=mean_of_gaussians)
 w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 
 with tf.Session() as sess:
@@ -267,7 +278,7 @@ with tf.Session() as sess:
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
     _, batch_loss, ls, ms, ss, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, m_summary, s_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], 
-    feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True})#, gaussian: gaussian2d}) 
+    feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True}) 
 
     summary_writer.add_summary(ls, global_step=b)
     summary_writer.add_summary(ms, global_step=b)
