@@ -17,8 +17,10 @@ import tensorflow as tf
 import scipy
 import scipy.stats as st
 import cv2
+import tensorflow_probability as tfp
 
 tf.reset_default_graph()
+
 
 # !pip3 install opencv-python
 
@@ -26,7 +28,8 @@ tf.reset_default_graph()
 
 WEIGHTS_PATH = '../cv2_data/vgg16-conv-weights.npz'
 DATA_PATH = '../cv2_data/'
-MODEL_PATH = '../cv2_data/models/'
+#MODEL_PATH = '../cv2_data/models/'
+MODEL_PATH_SAVE = '../cv2_data/models/learnable_gaussian/'
 
 weights = np.load(WEIGHTS_PATH)
 for k in weights.keys():
@@ -70,17 +73,24 @@ print('Loading test_X')
 test_X = create_dataset_from_files(cv2_testing)
 print(test_X.shape, test_X.dtype)
 
-def gaussian2d():
-    x = np.linspace(0, 1, 45+1)
-    y = np.linspace(0, 1, 80+1)
-    gaussian1d_x = np.diff(st.norm.cdf(x, loc=0.5, scale=0.2))
-    gaussian1d_y = np.diff(st.norm.cdf(y, loc=0.5, scale=0.2))
-    gaussian2d = np.outer(gaussian1d_x, gaussian1d_y).reshape((-1, 45, 80, 1))
+def tf_diff(a):
+    return a[1:]-a[:-1]
+
+def gaussian2d(mean, std):
+    x = tf.linspace(0., 1., 45+1)
+    y = tf.linspace(0., 1., 80+1)
+    tfd = tfp.distributions
+    dist = tfd.Normal(loc=mean, scale=std)
+    gaussian1d_x = tf_diff(dist.cdf(x))
+    gaussian1d_y = tf_diff(dist.cdf(y))
+    #gaussian2d = np.outer(gaussian1d_x, gaussian1d_y).reshape((-1, 45, 80, 1))
+    gaussian2d = tf.einsum('i,j->ij', gaussian1d_x, gaussian1d_y)
+    gaussian2d = tf.reshape(gaussian2d, shape=(-1, 45, 80, 1))
     return gaussian2d
 
 images = tf.placeholder(tf.uint8, [None, 180, 320, 3]) # None to indicate a dimension can vary at runtime
 labels = tf.placeholder(tf.uint8, [None, 180, 320, 1])
-gaussian = tf.placeholder(tf.float32, [None, 45, 80, 1])
+#gaussian = tf.placeholder(tf.float32, [None, 45, 80, 1])
 is_training = tf.placeholder(tf.bool)
 
 with tf.name_scope('preprocess') as scope:
@@ -147,7 +157,7 @@ with tf.name_scope('conv3_3') as scope:
 	act = tf.nn.relu(out, name=scope)
 
 with tf.name_scope('pool3') as scope:
-	pool3 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(1,1), padding='same')
+	pool3 = tf.layers.max_pooling2d(act, pool_size=(2,2), strides=(1,1), padding= 'same')
   
 with tf.name_scope('conv4_1') as scope:
 	kernel = tf.Variable(initial_value=weights['conv4_1_W'], trainable=True, name="weights")
@@ -160,7 +170,7 @@ with tf.name_scope('concat') as scope:
   out = tf.concat([pool2, pool3, act], -1)
 
 with tf.name_scope('dropout') as scope:
-  out = tf.layers.dropout(out, rate=0.5, training=is_training, name="dropout")
+  out = tf.layers.dropout(out, rate=0.2, training=is_training, name="dropout")
   
 with tf.name_scope('conv_sal_1') as scope:
   init = tf.initializers.glorot_normal()
@@ -179,8 +189,11 @@ with tf.name_scope('conv_sal_2') as scope:
   saliency_raw = tf.nn.relu(out, name=scope)  
 
 with tf.name_scope('gaussian') as scope:
+  mean = tf.Variable(tf.zeros([1], tf.float32), trainable=True, name="mean")
+  std = tf.Variable(tf.ones([1], tf.float32), trainable=True, name="std")
+  gaussian = gaussian2d(mean, std)
   shape = tf.convert_to_tensor([-1, 45, 80, 1])
-  gaussian = tf.reshape(tf.convert_to_tensor(gaussian), shape)
+  gaussian = tf.reshape(gaussian, shape)
   saliency_raw = tf.math.multiply(saliency_raw, gaussian, name=None)
 
 with tf.name_scope('loss') as scope:
@@ -225,7 +238,7 @@ def get_batch(gen, batchsize):
 
 batchsize = 32
 num_batches = 2000
-gaussian2d = gaussian2d() * 0.2
+#gaussian2d = gaussian2d() * 0.2
 
 saver = tf.train.Saver()
 for i, var in enumerate(saver._var_list):
@@ -241,14 +254,14 @@ w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 with tf.Session() as sess:
   summary_writer = tf.summary.FileWriter(logdir='./', graph=sess.graph)
   sess.run(tf.global_variables_initializer())
-  saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-10'))
+  #saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-267'))
 
   gen = data_shuffler(train_X, train_y)
 
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True, gaussian: gaussian2d}) 
+    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True})#, gaussian: gaussian2d}) 
 
     summary_writer.add_summary(ls, global_step=b)
     summary_writer.add_summary(fs, global_step=b)
@@ -258,7 +271,7 @@ with tf.Session() as sess:
     summary_writer.add_summary(ws, global_step=b)
 
     print('Batch {} done: batch loss {}'.format(b, batch_loss))
-    save_path = saver.save(sess, os.path.join(MODEL_PATH,'trained_model'), global_step=b)
+    save_path = saver.save(sess, os.path.join(MODEL_PATH_SAVE,'trained_model'), global_step=b)
       
   # run testing in smaller batches so we don't run out of memory.
   test_batch_size = 32
