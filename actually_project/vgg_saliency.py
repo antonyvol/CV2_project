@@ -83,14 +83,14 @@ def gaussian2d(mean, std):
     dist = tfd.Normal(loc=mean, scale=std)
     gaussian1d_x = tf_diff(dist.cdf(x))
     gaussian1d_y = tf_diff(dist.cdf(y))
-    #gaussian2d = np.outer(gaussian1d_x, gaussian1d_y).reshape((-1, 45, 80, 1))
     gaussian2d = tf.einsum('i,j->ij', gaussian1d_x, gaussian1d_y)
     gaussian2d = tf.reshape(gaussian2d, shape=(-1, 45, 80, 1))
     return gaussian2d
 
 images = tf.placeholder(tf.uint8, [None, 180, 320, 3]) # None to indicate a dimension can vary at runtime
 labels = tf.placeholder(tf.uint8, [None, 180, 320, 1])
-#gaussian = tf.placeholder(tf.float32, [None, 45, 80, 1])
+#init_mean = tf.placeholder(tf.float32, [1])
+#init_std = tf.placeholder(tf.float32, [1])
 is_training = tf.placeholder(tf.bool)
 
 with tf.name_scope('preprocess') as scope:
@@ -189,8 +189,10 @@ with tf.name_scope('conv_sal_2') as scope:
   saliency_raw = tf.nn.relu(out, name=scope)  
 
 with tf.name_scope('gaussian') as scope:
-  mean = tf.Variable(tf.zeros([1], tf.float32), trainable=True, name="mean")
-  std = tf.Variable(tf.ones([1], tf.float32), trainable=True, name="std")
+  #mean = tf.Variable(tf.zeros([1], tf.float32), initial_value=[0.5], trainable=True, name="mean")
+  #std = tf.Variable(tf.ones([1], tf.float32), initial_value=[1.], trainable=True, name="std")
+  mean = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="mean")
+  std = tf.Variable(initial_value=tf.constant(0.5), trainable=True, name="std")
   gaussian = gaussian2d(mean, std)
   shape = tf.convert_to_tensor([-1, 45, 80, 1])
   gaussian = tf.reshape(gaussian, shape)
@@ -238,6 +240,7 @@ def get_batch(gen, batchsize):
 
 batchsize = 32
 num_batches = 2000
+mean_std = tf.constant([0.5])
 #gaussian2d = gaussian2d() * 0.2
 
 saver = tf.train.Saver()
@@ -245,6 +248,8 @@ for i, var in enumerate(saver._var_list):
     print('Var {}: {}'.format(i, var))
 
 l_summary = tf.summary.scalar(name="loss", tensor=loss)
+m_summary = tf.summary.scalar(name="mean", tensor=mean)
+s_summary = tf.summary.scalar(name="std", tensor=std)
 f_img_summary = tf.summary.image(name="fixation", tensor=tf.image.convert_image_dtype(labels, tf.float32))
 i_img_summary = tf.summary.image(name="input", tensor=imgs_normalized)
 pred_img_summary = tf.summary.image(name="predicted_saliency", tensor=predicted_saliency)
@@ -252,18 +257,21 @@ targ_img_summary = tf.summary.image(name="prior", tensor=gaussian)
 w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 
 with tf.Session() as sess:
-  summary_writer = tf.summary.FileWriter(logdir='./', graph=sess.graph)
+  summary_writer = tf.summary.FileWriter(logdir='./learnable_prior_logs/', graph=sess.graph)
   sess.run(tf.global_variables_initializer())
-  #saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-267'))
+  #saver.restore(sess, os.path.join(MODEL_PATH_SAVE, 'trained_model-267'))
 
   gen = data_shuffler(train_X, train_y)
 
   for b in range(num_batches):
     batch_imgs, batch_fixations = get_batch(gen, batchsize)
     idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-    _, batch_loss, ls, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True})#, gaussian: gaussian2d}) 
+    _, batch_loss, ls, ms, ss, fs, i_s, ps, ts, ws = sess.run([minimize_op, loss, l_summary, m_summary, s_summary, f_img_summary, i_img_summary, pred_img_summary, targ_img_summary, w_summary], 
+    feed_dict={images: train_X[idx,...], labels: train_y[idx], is_training: True})#, gaussian: gaussian2d}) 
 
     summary_writer.add_summary(ls, global_step=b)
+    summary_writer.add_summary(ms, global_step=b)
+    summary_writer.add_summary(ss, global_step=b)
     summary_writer.add_summary(fs, global_step=b)
     summary_writer.add_summary(i_s, global_step=b)
     summary_writer.add_summary(ps, global_step=b)
@@ -284,7 +292,7 @@ with tf.Session() as sess:
     stop_idx = start_idx + test_batch_size
     test_idx = np.arange(start_idx, stop_idx)
 
-    test_loss = sess.run([loss], feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx], is_training: False, gaussian: gaussian2d})
+    test_loss = sess.run([loss], feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx], is_training: False})
     print('Test batch {} done: batch loss {}'.format(test_batch, test_loss))
     test_losses.append(test_loss)
 
