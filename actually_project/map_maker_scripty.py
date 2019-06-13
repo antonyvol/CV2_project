@@ -26,6 +26,7 @@ tf.reset_default_graph()
 WEIGHTS_PATH = '../cv2_data/vgg16-conv-weights.npz'
 DATA_PATH = '../cv2_data/'
 MODEL_PATH = '../cv2_data/models/'
+RESULTS_PATH = '../cv2_data/results_angelie_kraft_anton_volkov/'
 
 # tf.reset_default_graph()
 
@@ -43,6 +44,7 @@ def create_dataset_from_files(files, grey=False):
     listing = os.listdir(files)
     res = np.array([load_img(os.path.join(files, img)) for i, img in enumerate(listing)]) # every 5th image
     return res
+
 
 # cv2_data_path = '/content/drive/My Drive/CV/cv2_data/' # replace with your path
 # cv2_training_imgs = os.path.join(DATA_PATH,'train/images')
@@ -184,66 +186,20 @@ with tf.name_scope('gaussian') as scope:
   max_value_per_image = tf.reduce_max(saliency_raw, axis=[1,2,3], keepdims=True)
   predicted_saliency = (saliency_raw / max_value_per_image)
 
-# with tf.name_scope('preprocess_labels') as scope:
-#   fixations_normalized = tf.image.convert_image_dtype(labels, tf.float32)
-
-# with tf.name_scope('loss') as scope:
-# 	# normalize saliency
-#   max_value_per_image = tf.reduce_max(saliency_raw, axis=[1,2,3], keepdims=True)
-#   predicted_saliency = (saliency_raw / max_value_per_image)
-  
-#   # Prediction is smaller than target, so downscale target to same size
-#   target_shape = predicted_saliency.shape[1:3]
-#   print(fixations_normalized)
-#   target_downscaled = tf.image.resize_images(fixations_normalized, target_shape)
-
-# 	# Loss function from Cornia et al. (2016) [with higher weight for salient pixels]
-#   alpha = 1.01
-#   weights = 1.0 / (alpha - target_downscaled)
-#   loss = tf.losses.mean_squared_error(labels=target_downscaled, 
-# 										predictions=predicted_saliency, 
-# 										weights=weights)
-
-# 	# Optimizer settings from Cornia et al. (2016) [except for decay]
-#   optimizer = tf.train.MomentumOptimizer(learning_rate=1e-3, momentum=0.9, use_nesterov=True)
-#   minimize_op = optimizer.minimize(loss)
-
-# with tf.name_scope('accuracy') as scope:
-#   acc, acc_op = tf.metrics.accuracy(labels=target_downscaled, 
-#                                     predictions=predicted_saliency)
-
-# def data_shuffler(imgs, targets):
-# 	while True: # produce new epochs forever
-# 		# Shuffle the data for this epoch
-# 		idx = np.arange(imgs.shape[0])
-# 		np.random.shuffle(idx)
-
-# 		imgs = imgs[idx]
-# 		targets = targets[idx]
-# 		for i in range(imgs.shape[0]):
-# 			yield imgs[i], targets[i]
-
-# def get_batch(gen, batchsize):
-# 	batch_imgs = []
-# 	batch_fixations = []
-# 	for i in range(batchsize):
-# 		img, target = next(gen)
-# 		batch_imgs.append(img)
-# 		batch_fixations.append(target)
-# 	return np.array(batch_imgs), np.array(batch_fixations)
-
-# batchsize = 32
-# num_batches = 100
 
 gaussian2d = gaussian2d() 
 
+
+
 import matplotlib.pyplot as plt
+
 # saver = tf.train.import_meta_graph(os.path.join(MODEL_PATH, 'trained_model-1.meta'))
 saver = tf.train.Saver()
 # for tensor in tf.get_default_graph().get_operations():
 #     print (tensor.name)
 # from tensorflow.python.training import checkpoint_utils as cp
 # print(cp.list_variables('C:/Users/anton/Documents/Study/CV2_project/cv2_data/models/trained_model-1'))
+test_filenames = ["".join((os.path.splitext(img)[0], '_prediction.jpg')) for img in os.listdir(cv2_testing)]
 
 with tf.Session() as sess:
 # #   # writer = tf.summary.FileWriter(logdir="./", graph=sess.graph)
@@ -251,59 +207,14 @@ with tf.Session() as sess:
   saver.restore(sess, os.path.join(MODEL_PATH, 'trained_model-267'))
 #   print('Model restored yäy')
 # # #   print('conv_sal_1/kernel_1 = {}'.format(kernel.eval()) )
-  res = sess.run(predicted_saliency,
-      feed_dict={images: np.expand_dims(validation_X[10], 0), gaussian: gaussian2d})
-
-  
-  #img = cv2.resize(res.squeeze(), (320, 180))
-  #cv2.imshow('map', img)
-  #cv2.imshow('img',test_X[6])
-  #cv2.waitKey(0)
-  #cv2.destroyAllWindows()
-  # gen = data_shuffler(train_X, train_y)
-  plt.imshow(validation_X[10].squeeze())
-  plt.show() 
-  plt.imshow(validation_y[10].squeeze())
-  plt.show()  
-  plt.imshow(res.squeeze())
-  plt.show() 
-  # for b in range(num_batches):
-  #   batch_imgs, batch_fixations = get_batch(gen, batchsize)
-  #   idx = np.random.choice(train_X.shape[0], batchsize, replace=False) # sample random indices
-  #   _, batch_loss = sess.run([minimize_op, loss],
-  #     feed_dict={images: train_X[idx,...], labels: train_y[idx]})
-
-  #   print('Batch {} done: batch loss {}'.format(b, batch_loss))
-  #   save_path = saver.save(sess, os.path.join(MODEL_PATH,'trained_model_' + str(b) + '.ckpt'))
-
-      
-  # run testing in smaller batches so we don't run out of memory.
-  # test_batch_size = 100
-  # num_test_batches = validation_X.shape[0]/test_batch_size
-  # test_losses = []
-  # test_accs = []
-
-  # for test_batch in range(int(num_test_batches)):
-  #   start_idx = test_batch * test_batch_size
-  #   stop_idx = start_idx + test_batch_size
-  #   test_idx = np.arange(start_idx, stop_idx)
-
-  #   test_loss = sess.run([loss], 
-  #                                       feed_dict={images: validation_X[test_idx], labels: validation_y[test_idx]})
-  #   print('Test batch {} done: batch loss {}'.format(test_batch, test_loss))
-  #   test_losses.append(test_loss)
-  #   #test_accs.append(test_acc)
-
-  #   print('Test loss: {} -- test accuracy: {}'.format(np.average(test_losses), np.average(test_accs)))
-
-  # we could save at end of training, for example
-
-
-
-"""###TODO:
-* check if loss is calculated correctly YES
-* add prior (layer)
-* add accuracy calculation NO
-* hyperparameter optimzation
-"""
-
+  for i in range(len(test_X[:5])):
+    res = sess.run(predicted_saliency, feed_dict={images: np.expand_dims(test_X[i], 0), gaussian: gaussian2d})
+    img = tf.reshape(res, [45, 80, 1])
+    img = tf.image.resize(img, [120, 320])
+    img = tf.image.convert_image_dtype(img, tf.uint8)
+    img_jpeg = tf.image.encode_jpeg(img, format='grayscale')
+    img_path = os.path.join(RESULTS_PATH, test_filenames[i])
+    print(img_path)
+    tf.io.write_file(img_path, img_jpeg.eval(), name="file_writer")
+    
+    

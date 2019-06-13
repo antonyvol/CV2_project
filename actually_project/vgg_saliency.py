@@ -228,7 +228,7 @@ with tf.name_scope('loss') as scope:
 										weights=weights)
 
 	# Optimizer settings from Cornia et al. (2016) [except for decay]
-  optimizer = tf.train.MomentumOptimizer(learning_rate=0.1, momentum=0.9, use_nesterov=True)
+  optimizer = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9, use_nesterov=True)
   minimize_op = optimizer.minimize(loss)
 
 def data_shuffler(imgs, targets):
@@ -270,7 +270,7 @@ w_summary = tf.summary.scalar(name="weights", tensor=tf.reduce_min(weights))
 with tf.Session() as sess:
   summary_writer = tf.summary.FileWriter(logdir='./learnable_prior_logs/', graph=sess.graph)
   sess.run(tf.global_variables_initializer())
-  #saver.restore(sess, os.path.join(MODEL_PATH_SAVE, 'trained_model-267'))
+  saver.restore(sess, os.path.join(MODEL_PATH_SAVE, 'trained_model-50'))
 
   gen = data_shuffler(train_X, train_y)
 
